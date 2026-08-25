@@ -1,0 +1,149 @@
+{
+  "name": "05 - Release Stale Reservations",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 15
+            }
+          ]
+        }
+      },
+      "id": "8b8945a3-d01f-4774-9f84-877911ad3cfb",
+      "name": "Cron - A cada 15 min",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        250,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{$env.BACKEND_API_URL}}/api/automation/offers",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "status",
+              "value": "RESERVED"
+            },
+            {
+              "name": "reserved_before_minutes",
+              "value": "={{$env.RESERVATION_TIMEOUT_MINUTES || 10}}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "d26272c0-e14c-49e5-9551-b494d44fd8a7",
+      "name": "Consultar Reservas Expiradas",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        500,
+        300
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "CREDENTIAL_ID",
+          "name": "Backend API Header Auth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "offers",
+        "options": {}
+      },
+      "id": "2aa6f58e-60e4-4cd9-97bb-6dcaa084fca9",
+      "name": "Separar Itens",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        750,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.BACKEND_API_URL}}/api/automation/offers/{{$json.offer_id}}/release",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { reason: 'reserva expirada (timeout)' } }}",
+        "options": {}
+      },
+      "id": "7413216f-b5d3-4d78-9871-c35d6456e92d",
+      "name": "Liberar Reserva Expirada",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1000,
+        300
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "CREDENTIAL_ID",
+          "name": "Backend API Header Auth"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Cron - A cada 15 min": {
+      "main": [
+        [
+          {
+            "node": "Consultar Reservas Expiradas",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Consultar Reservas Expiradas": {
+      "main": [
+        [
+          {
+            "node": "Separar Itens",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Separar Itens": {
+      "main": [
+        [
+          {
+            "node": "Liberar Reserva Expirada",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "1",
+  "meta": {
+    "instanceId": ""
+  },
+  "tags": [
+    "afiliados",
+    "whatsapp",
+    "manutencao"
+  ]
+}

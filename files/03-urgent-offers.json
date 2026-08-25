@@ -1,0 +1,216 @@
+{
+  "name": "03 - Urgent Offers",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "oferta-urgente",
+        "options": {}
+      },
+      "id": "d10024e1-2872-4bba-96e5-0aa7b83354b1",
+      "name": "Webhook - Oferta Urgente",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        250,
+        300
+      ],
+      "webhookId": "URGENT-OFFERS-WEBHOOK-UUID"
+    },
+    {
+      "parameters": {
+        "jsCode": "const headers = $input.first().json.headers || {};\nconst secret = headers['x-automation-secret'];\nconst valid = secret && secret === $env.URGENT_WEBHOOK_SECRET;\nreturn [{ json: { ...$input.first().json.body, _secretValid: valid } }];\n"
+      },
+      "id": "028c9863-32bc-414e-810f-d0e4436072a0",
+      "name": "Validar X-Automation-Secret",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        500,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{$json._secretValid}}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "e5b3868e-bccc-4502-a837-e7cff7417024",
+      "name": "Secret Válido?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        750,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { error: 'unauthorized' } }}",
+        "options": {
+          "responseCode": 401
+        }
+      },
+      "id": "b71b67c4-9d39-4495-8261-eacdda275a25",
+      "name": "Responder 401 - Não Autorizado",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.2,
+      "position": [
+        1000,
+        500
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { received: true, offer_id: $json.offer_id } }}",
+        "options": {}
+      },
+      "id": "3642b8ca-3100-4747-8367-61b099bb3252",
+      "name": "Responder 200 - Recebido",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.2,
+      "position": [
+        1000,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.BACKEND_API_URL}}/api/automation/offers/{{$json.offer_id}}/priority",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { priority: 'URGENT', reason: $json.reason || 'cupom urgente / desconto grande / expirando' } }}",
+        "options": {}
+      },
+      "id": "d98a4502-1cb3-4a4b-8ccf-1ee2aabcfd8e",
+      "name": "Marcar Prioridade URGENT no Backend",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1250,
+        300
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "CREDENTIAL_ID",
+          "name": "Backend API Header Auth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "value": "WORKFLOW_ID_01_PUBLISH",
+          "mode": "list",
+          "cachedResultName": "01 - Publish WhatsApp Offers"
+        },
+        "options": {}
+      },
+      "id": "ed4116c6-d17c-4564-998a-d9384aec13d6",
+      "name": "Disparar Execução do WF Principal",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        1500,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook - Oferta Urgente": {
+      "main": [
+        [
+          {
+            "node": "Validar X-Automation-Secret",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validar X-Automation-Secret": {
+      "main": [
+        [
+          {
+            "node": "Secret Válido?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Secret Válido?": {
+      "main": [
+        [
+          {
+            "node": "Marcar Prioridade URGENT no Backend",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Responder 401 - Não Autorizado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Marcar Prioridade URGENT no Backend": {
+      "main": [
+        [
+          {
+            "node": "Responder 200 - Recebido",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Disparar Execução do WF Principal",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "1",
+  "meta": {
+    "instanceId": ""
+  },
+  "tags": [
+    "afiliados",
+    "whatsapp",
+    "urgente",
+    "webhook"
+  ]
+}

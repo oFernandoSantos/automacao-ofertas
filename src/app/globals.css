@@ -1,0 +1,59 @@
+@import "tailwindcss";
+
+:root {
+  --background: #02050a;
+  --foreground: #e9f5ff;
+  --card: #07101d;
+  --card-foreground: #e9f5ff;
+  --muted: #0b1b2e;
+  --muted-foreground: #8ba6c2;
+  --primary: #008cff;
+  --primary-foreground: #eaf7ff;
+  --accent: #004d91;
+  --accent-foreground: #d9f1ff;
+  --destructive: #d9435b;
+  --destructive-foreground: #fff5f6;
+  --border: #16324f;
+  --input: #050c16;
+  --ring: #00a6ff;
+}
+
+* {
+  border-color: var(--border);
+}
+
+*::selection {
+  background: #006cc4;
+  color: #f2fbff;
+}
+
+body {
+  background:
+    radial-gradient(circle at top left, rgba(0, 140, 255, 0.14), transparent 30%),
+    radial-gradient(circle at bottom right, rgba(0, 64, 150, 0.16), transparent 32%),
+    var(--background);
+  color: var(--foreground);
+  font-family: var(--font-manrope), "Segoe UI", sans-serif;
+  min-height: 100vh;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+select,
+input,
+textarea {
+  color-scheme: dark;
+}
+
+select {
+  outline: none;
+  transition: border-color 160ms ease, box-shadow 160ms ease;
+}
+
+select:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(0, 166, 255, 0.18);
+}

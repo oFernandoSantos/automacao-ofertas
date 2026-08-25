@@ -1,0 +1,169 @@
+{
+  "name": "07 - Analytics Sync",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 6
+            }
+          ]
+        }
+      },
+      "id": "63db03aa-3733-42cd-a332-8dfe0661e861",
+      "name": "Cron - A cada 6 horas",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        250,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{$env.BACKEND_API_URL}}/api/automation/analytics/metrics",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {}
+      },
+      "id": "94f8b672-c8a3-4312-a7cc-6e7e17d44b4f",
+      "name": "Buscar Métricas de Cliques/Conversão",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        500,
+        300
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "CREDENTIAL_ID",
+          "name": "Backend API Header Auth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Recalcula score de cada oferta com base em cliques, conversões e recência.\n// Ajuste os pesos conforme a estratégia do seu negócio.\nconst items = $input.all();\nreturn items.map(item => {\n  const d = item.json;\n  const clickWeight = 0.4, convWeight = 0.5, recencyWeight = 0.1;\n  const clicks = d.clicks || 0;\n  const conversions = d.conversions || 0;\n  const ageHours = d.age_hours || 0;\n  const recencyScore = Math.max(0, 1 - ageHours / 72);\n  const score = (clicks * clickWeight) + (conversions * convWeight * 10) + (recencyScore * recencyWeight);\n  return { json: { ...d, score: Number(score.toFixed(2)) } };\n});\n"
+      },
+      "id": "8030b575-ed44-4aa5-99ce-1cded376d2c4",
+      "name": "Calcular Score / Melhores Horários",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        750,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.BACKEND_API_URL}}/api/automation/analytics/scores",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { scores: $items().map(i => i.json) } }}",
+        "options": {}
+      },
+      "id": "dce14727-e708-4627-9906-3c612e3a1f0a",
+      "name": "Atualizar Scores no Backend",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1000,
+        300
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "CREDENTIAL_ID",
+          "name": "Backend API Header Auth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.BACKEND_API_URL}}/api/automation/analytics/best-hours",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {}
+      },
+      "id": "6ec09175-7cfe-47b6-b46a-c923edc21ecf",
+      "name": "Calcular Melhores Horários/Categorias",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1250,
+        300
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "CREDENTIAL_ID",
+          "name": "Backend API Header Auth"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Cron - A cada 6 horas": {
+      "main": [
+        [
+          {
+            "node": "Buscar Métricas de Cliques/Conversão",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar Métricas de Cliques/Conversão": {
+      "main": [
+        [
+          {
+            "node": "Calcular Score / Melhores Horários",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calcular Score / Melhores Horários": {
+      "main": [
+        [
+          {
+            "node": "Atualizar Scores no Backend",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Atualizar Scores no Backend": {
+      "main": [
+        [
+          {
+            "node": "Calcular Melhores Horários/Categorias",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "1",
+  "meta": {
+    "instanceId": ""
+  },
+  "tags": [
+    "afiliados",
+    "whatsapp",
+    "analytics"
+  ]
+}

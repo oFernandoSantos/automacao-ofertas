@@ -1,0 +1,978 @@
+{
+  "name": "01 - Publish WhatsApp Offers",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 10
+            }
+          ]
+        }
+      },
+      "id": "f753b0e1-163c-44be-aa4d-2c9c0f75d3b7",
+      "name": "Cron - A cada 10 min",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        250,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{$env.BACKEND_API_URL}}/api/automation/status",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {}
+      },
+      "id": "604e5543-6df8-41f2-ad8c-2d150e21cbcf",
+      "name": "Status da Automação",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        500,
+        300
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "CREDENTIAL_ID",
+          "name": "Backend API Header Auth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{$json.enabled}}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "8df6173d-afa5-4e96-bc20-5ad5986ee146",
+      "name": "Automação Ativa?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        750,
+        300
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "9a6d36ed-c43a-4ef6-b3dd-d65a70954fea",
+      "name": "Parar - Automação Desligada",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        1000,
+        500
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{$env.BACKEND_API_URL}}/api/automation/offers/next",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true,
+              "fullResponse": true
+            }
+          }
+        }
+      },
+      "id": "4e203454-0c02-4c73-9f19-229df9fd8b1b",
+      "name": "Consultar Próxima Oferta",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1000,
+        250
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "CREDENTIAL_ID",
+          "name": "Backend API Header Auth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const res = $input.first().json;\nconst statusCode = res.statusCode || 200;\nconst body = res.body !== undefined ? res.body : res;\nconst hasOffer = statusCode !== 204 && body && body.offer;\nreturn [{ json: { hasOffer: !!hasOffer, offer: hasOffer ? body.offer : null } }];\n"
+      },
+      "id": "87ed224b-a122-4bfd-ab19-77d96aec69e4",
+      "name": "Verificar Se Há Oferta",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1250,
+        250
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{$json.hasOffer}}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "104aeb16-e8dc-48a7-ba39-f9fec35f9c68",
+      "name": "Existe Oferta?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1500,
+        250
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "b16c0a88-5fd3-47a4-a441-d5b52eedc9ea",
+      "name": "Parar - Sem Ofertas Disponíveis",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        1750,
+        450
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.BACKEND_API_URL}}/api/automation/offers/{{$json.offer.offer_id}}/reserve",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { workflow: 'whatsapp-main', execution_id: $execution.id } }}",
+        "options": {}
+      },
+      "id": "7a3d87cb-1a02-4a29-8179-ede8378e4393",
+      "name": "Reservar Oferta",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1750,
+        100
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "CREDENTIAL_ID",
+          "name": "Backend API Header Auth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const offer = $('Verificar Se Há Oferta').first().json.offer;\nconst required = ['offer_id','marketplace','title','price','affiliate_url','tracking_url'];\nconst missing = required.filter(f => offer[f] === undefined || offer[f] === null || offer[f] === '');\nreturn [{ json: { ...offer, _valid: missing.length === 0, _missing: missing } }];\n"
+      },
+      "id": "a85f8f37-aea8-45f0-bd7a-367623f5b880",
+      "name": "Validar Payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2000,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{$json._valid}}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "98f1d567-426d-401a-a5b7-39b5455db4d1",
+      "name": "Payload Válido?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        2250,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.BACKEND_API_URL}}/api/automation/offers/{{$json.offer_id}}/failed",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { execution_id: $execution.id, stage: 'FAILED_VALIDATION', error: 'Campos ausentes: ' + $json._missing.join(', ') } }}",
+        "options": {}
+      },
+      "id": "d7222f27-1d2b-4fa5-bfc1-c5b643a655c2",
+      "name": "Marcar FAILED_VALIDATION",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2500,
+        300
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "CREDENTIAL_ID",
+          "name": "Backend API Header Auth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first().json;\nconst ALLOWED_DOMAINS = {\n  MERCADO_LIVRE: ['mercadolivre.com.br','mercadolivre.com','mercadolibre.com'],\n  SHOPEE: ['shopee.com.br','shope.ee'],\n  AMAZON: ['amazon.com.br','amzn.to']\n};\n// domínios oficiais de encurtamento/redirecionamento próprios cadastrados\nconst OWN_TRACKING_DOMAINS = (($env.TRACKING_ALLOWED_DOMAINS || 'meusite.com').split(','));\n\nconst affiliateUrl = item.affiliate_url;\nconst trackingUrl = item.tracking_url;\nconst marketplace = item.marketplace;\n\nif (!affiliateUrl) {\n  return [{ json: { ...item, _linkValid: false, _linkError: 'affiliate_url ausente - ABORTAR' } }];\n}\n\nfunction hostOf(u) { try { return new URL(u).hostname.replace('www.',''); } catch(e) { return null; } }\n\nconst affHost = hostOf(affiliateUrl);\nconst allowedForMarketplace = ALLOWED_DOMAINS[marketplace] || [];\nconst affHostOk = affHost && allowedForMarketplace.some(d => affHost === d || affHost.endsWith('.' + d));\n\nif (!affHostOk) {\n  return [{ json: { ...item, _linkValid: false, _linkError: 'affiliate_url com domínio não permitido: ' + affHost } }];\n}\n\n// link publicado: preferir tracking_url, validado contra domínios próprios cadastrados\nlet linkToPublish = affiliateUrl;\nif (trackingUrl) {\n  const trkHost = hostOf(trackingUrl);\n  const trkHostOk = trkHost && OWN_TRACKING_DOMAINS.some(d => trkHost === d.trim() || trkHost.endsWith('.' + d.trim()));\n  if (trkHostOk) linkToPublish = trackingUrl;\n}\n\nreturn [{ json: { ...item, _linkValid: true, link_to_publish: linkToPublish } }];\n"
+      },
+      "id": "eb94616f-be3e-4979-939f-b8d4a231ecc5",
+      "name": "Validate Affiliate URL",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2500,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{$json._linkValid}}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "4333eb22-1c91-41f0-86f7-6dcb6dfdcc2d",
+      "name": "Link Válido?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        2750,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.BACKEND_API_URL}}/api/automation/offers/{{$json.offer_id}}/failed",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { execution_id: $execution.id, stage: 'LINK_VALIDATION', error: $json._linkError } }}",
+        "options": {}
+      },
+      "id": "e30d193f-e0d9-41b5-ab08-a14e08c94f92",
+      "name": "Marcar Falha - Link Inválido",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3000,
+        300
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "CREDENTIAL_ID",
+          "name": "Backend API Header Auth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{$env.BACKEND_API_URL}}/api/automation/publications/check",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "offer_id",
+              "value": "={{$json.offer_id}}"
+            },
+            {
+              "name": "product_id",
+              "value": "={{$json.product_id}}"
+            },
+            {
+              "name": "channel_id",
+              "value": "={{$env.WHATSAPP_CHANNEL_ID}}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "46fc2b4c-241e-491c-89f8-e9accbac3eb8",
+      "name": "Verificar Cooldown/Duplicidade/Frequência",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3000,
+        100
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "CREDENTIAL_ID",
+          "name": "Backend API Header Auth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combinationMode": "mergeByPosition",
+        "options": {}
+      },
+      "id": "4bd30a3a-a860-48f0-b9b3-d39331507357",
+      "name": "Merge Oferta + Check",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [
+        3250,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{$json.can_publish}}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "3cec5c47-8057-4172-8882-e3e61dab23bd",
+      "name": "Pode Publicar? (cooldown/dup/freq)",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        3500,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.BACKEND_API_URL}}/api/automation/offers/{{$json.offer_id}}/release",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { execution_id: $execution.id, reason: $json.reason || 'cooldown/duplicidade/frequência' } }}",
+        "options": {}
+      },
+      "id": "b9f34367-8e33-4527-ae46-b660dfe4fb89",
+      "name": "Liberar Reserva (bloqueado)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3750,
+        300
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "CREDENTIAL_ID",
+          "name": "Backend API Header Auth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first().json;\nconst startHour = parseInt($env.PUBLISH_WINDOW_START_HOUR || '8', 10);\nconst startMin = parseInt($env.PUBLISH_WINDOW_START_MIN || '0', 10);\nconst endHour = parseInt($env.PUBLISH_WINDOW_END_HOUR || '22', 10);\nconst endMin = parseInt($env.PUBLISH_WINDOW_END_MIN || '30', 10);\n\nconst now = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }));\nconst minutesNow = now.getHours() * 60 + now.getMinutes();\nconst minutesStart = startHour * 60 + startMin;\nconst minutesEnd = endHour * 60 + endMin;\n\nconst withinWindow = minutesNow >= minutesStart && minutesNow <= minutesEnd;\nreturn [{ json: { ...item, _withinWindow: withinWindow } }];\n"
+      },
+      "id": "23f09e0a-7359-4d91-9d37-83ff3706d79d",
+      "name": "Verificar Janela de Horário",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3750,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{$json._withinWindow}}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "fb4ddde7-c7a9-4456-986f-236996038a6a",
+      "name": "Dentro do Horário Permitido?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        4000,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.BACKEND_API_URL}}/api/automation/offers/{{$json.offer_id}}/release",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { execution_id: $execution.id, reason: 'fora da janela de horário permitida' } }}",
+        "options": {}
+      },
+      "id": "c88d8c2d-5866-4873-b880-e0afd897ac9c",
+      "name": "Liberar Reserva (fora do horário)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        4250,
+        300
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "CREDENTIAL_ID",
+          "name": "Backend API Header Auth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const o = $input.first().json;\n\nfunction formatBRL(value) {\n  const n = Number(value);\n  if (isNaN(n)) return null;\n  return n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });\n}\n\nconst price = formatBRL(o.price);\nconst originalPriceLine = o.original_price ? `De: ~${formatBRL(o.original_price)}~\\n` : '';\nconst discountLine = o.discount_percentage ? `🔻 ${o.discount_percentage}% OFF` : '';\nconst couponLine = o.coupon ? `🎟️ CUPOM: ${o.coupon}` : '';\nconst shippingLine = o.free_shipping === true ? '🚚 Frete grátis' : '';\nconst estimatedLine = o.estimated_final_price ? `💵 Pode chegar a ${formatBRL(o.estimated_final_price)} com o cupom.` : '';\n\nconst templates = {\n  MERCADO_LIVRE: `🔥 OFERTA NO MERCADO LIVRE!\\n\\n${o.title}\\n\\n${originalPriceLine}💰 Por: ${price}\\n\\n${discountLine}\\n${couponLine}\\n${shippingLine}\\n${estimatedLine}\\n\\n🛒 Comprar:\\n${o.link_to_publish}\\n\\n⚠️ Preço, estoque e promoção podem mudar.`,\n  SHOPEE: `🧡 ACHADO NA SHOPEE!\\n\\n${o.title}\\n\\n💸 ${price}\\n\\n${discountLine}\\n${couponLine}\\n\\n🛒 Ver oferta:\\n${o.link_to_publish}\\n\\n⚠️ Confira as condições da promoção no aplicativo/site.`,\n  AMAZON: `🛒 OFERTA NA AMAZON!\\n\\n${o.title}\\n\\n💰 ${price}\\n\\n${discountLine}\\n${couponLine}\\n\\n👉 Ver oferta:\\n${o.link_to_publish}\\n\\n⚠️ Preço e disponibilidade podem mudar.`\n};\n\nlet message = templates[o.marketplace] || templates.MERCADO_LIVRE;\n// remove linhas em branco duplicadas geradas por campos opcionais ausentes\nmessage = message.split('\\n').filter((l, idx, arr) => !(l.trim() === '' && arr[idx-1] && arr[idx-1].trim() === '')).join('\\n');\n\nreturn [{ json: { ...o, message } }];\n"
+      },
+      "id": "031659d4-ed5a-46bb-bc5a-e10368013cbc",
+      "name": "Build Offer Message",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4500,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "value": "WORKFLOW_ID_02_EVOLUTION",
+          "mode": "list",
+          "cachedResultName": "02 - Send via Evolution API"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "destination": "={{$env.WHATSAPP_CHANNEL_DESTINATION}}",
+            "message": "={{$json.message}}",
+            "image": "={{$json.image || ''}}",
+            "offer_id": "={{$json.offer_id}}",
+            "publication_id": "={{$json.publication_id || $json.offer_id + '-' + $execution.id}}"
+          }
+        },
+        "options": {}
+      },
+      "id": "d1b47067-e933-4f3c-9a0e-71ce10a277f1",
+      "name": "Enviar via Evolution API (Subworkflow)",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        4750,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{$json.success}}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "dba3938e-5ae6-4a92-9f65-ff3b9735f7b1",
+      "name": "Envio Teve Sucesso?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        5000,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.BACKEND_API_URL}}/api/automation/offers/{{$json.offer_id}}/published",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { execution_id: $execution.id, provider: 'EVOLUTION_API', message_id: $json.message_id, remote_jid: $json.remote_jid, destination: $json.destination, published_at: $json.timestamp || $now.toISO() } }}",
+        "options": {}
+      },
+      "id": "7754b3c4-3ca4-4179-a67d-8fefdccc9ce8",
+      "name": "Confirmar Publicação",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        5250,
+        0
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "CREDENTIAL_ID",
+          "name": "Backend API Header Auth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.BACKEND_API_URL}}/api/automation/offers/{{$json.offer_id}}/failed",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { execution_id: $execution.id, stage: 'EVOLUTION_API', error: $json.error || 'Falha desconhecida no envio' } }}",
+        "options": {}
+      },
+      "id": "2b2273a9-9dfa-41e7-bf08-980be4d85f89",
+      "name": "Marcar Falha de Envio",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        5250,
+        250
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "CREDENTIAL_ID",
+          "name": "Backend API Header Auth"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "id": "cca689e6-9e51-4e10-b7c5-fd240a3141b2",
+      "name": "Salvar Log (Sucesso)",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        5500,
+        0
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "5c3569f0-1c81-47f3-9412-a59dba8d164e",
+      "name": "Salvar Log (Falha)",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        5500,
+        250
+      ]
+    }
+  ],
+  "connections": {
+    "Cron - A cada 10 min": {
+      "main": [
+        [
+          {
+            "node": "Status da Automação",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Status da Automação": {
+      "main": [
+        [
+          {
+            "node": "Automação Ativa?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Automação Ativa?": {
+      "main": [
+        [
+          {
+            "node": "Consultar Próxima Oferta",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Parar - Automação Desligada",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Consultar Próxima Oferta": {
+      "main": [
+        [
+          {
+            "node": "Verificar Se Há Oferta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verificar Se Há Oferta": {
+      "main": [
+        [
+          {
+            "node": "Existe Oferta?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Existe Oferta?": {
+      "main": [
+        [
+          {
+            "node": "Reservar Oferta",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Parar - Sem Ofertas Disponíveis",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reservar Oferta": {
+      "main": [
+        [
+          {
+            "node": "Validar Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validar Payload": {
+      "main": [
+        [
+          {
+            "node": "Payload Válido?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Payload Válido?": {
+      "main": [
+        [
+          {
+            "node": "Validate Affiliate URL",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Marcar FAILED_VALIDATION",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Affiliate URL": {
+      "main": [
+        [
+          {
+            "node": "Link Válido?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Link Válido?": {
+      "main": [
+        [
+          {
+            "node": "Verificar Cooldown/Duplicidade/Frequência",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge Oferta + Check",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Marcar Falha - Link Inválido",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verificar Cooldown/Duplicidade/Frequência": {
+      "main": [
+        [
+          {
+            "node": "Merge Oferta + Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Oferta + Check": {
+      "main": [
+        [
+          {
+            "node": "Pode Publicar? (cooldown/dup/freq)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pode Publicar? (cooldown/dup/freq)": {
+      "main": [
+        [
+          {
+            "node": "Verificar Janela de Horário",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Liberar Reserva (bloqueado)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verificar Janela de Horário": {
+      "main": [
+        [
+          {
+            "node": "Dentro do Horário Permitido?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Dentro do Horário Permitido?": {
+      "main": [
+        [
+          {
+            "node": "Build Offer Message",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Liberar Reserva (fora do horário)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Offer Message": {
+      "main": [
+        [
+          {
+            "node": "Enviar via Evolution API (Subworkflow)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enviar via Evolution API (Subworkflow)": {
+      "main": [
+        [
+          {
+            "node": "Envio Teve Sucesso?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Envio Teve Sucesso?": {
+      "main": [
+        [
+          {
+            "node": "Confirmar Publicação",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Marcar Falha de Envio",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Confirmar Publicação": {
+      "main": [
+        [
+          {
+            "node": "Salvar Log (Sucesso)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Marcar Falha de Envio": {
+      "main": [
+        [
+          {
+            "node": "Salvar Log (Falha)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "1",
+  "meta": {
+    "instanceId": ""
+  },
+  "tags": [
+    "afiliados",
+    "whatsapp",
+    "producao"
+  ]
+}

@@ -1,0 +1,698 @@
+{
+  "name": "02 - Send via Evolution API",
+  "nodes": [
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "destination"
+            },
+            {
+              "name": "message"
+            },
+            {
+              "name": "image"
+            },
+            {
+              "name": "offer_id"
+            },
+            {
+              "name": "publication_id"
+            }
+          ]
+        }
+      },
+      "id": "6310a7b0-8b3e-403e-9f09-dcf646a8dd5a",
+      "name": "Execute Workflow Trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        250,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "manual",
+        "duplicateItem": false,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1",
+              "name": "evolutionApiUrl",
+              "value": "={{$env.EVOLUTION_API_URL}}",
+              "type": "string"
+            },
+            {
+              "id": "2",
+              "name": "evolutionInstance",
+              "value": "={{$env.EVOLUTION_INSTANCE}}",
+              "type": "string"
+            },
+            {
+              "id": "3",
+              "name": "evolutionApiVersion",
+              "value": "={{$env.EVOLUTION_API_VERSION}}",
+              "type": "string"
+            },
+            {
+              "id": "4",
+              "name": "debugMode",
+              "value": "={{$env.AUTOMATION_DEBUG === 'true'}}",
+              "type": "boolean"
+            },
+            {
+              "id": "5",
+              "name": "automationEnv",
+              "value": "={{$env.AUTOMATION_ENV}}",
+              "type": "string"
+            },
+            {
+              "id": "6",
+              "name": "attempt",
+              "value": 1,
+              "type": "number"
+            },
+            {
+              "id": "7",
+              "name": "destination",
+              "value": "={{$env.AUTOMATION_ENV === 'test' ? $env.WHATSAPP_TEST_DESTINATION : $json.destination}}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "96667590-82c0-4c46-b9ce-017f27003f19",
+      "name": "Carregar Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        500,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{$env.BACKEND_API_URL}}/api/automation/publications/{{$json.publication_id}}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true,
+              "fullResponse": true
+            }
+          }
+        }
+      },
+      "id": "bcb2b9bf-6a39-4bb5-8c30-52f5adfdc16a",
+      "name": "Verificar Publicação Existente",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        750,
+        300
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "CREDENTIAL_ID",
+          "name": "Backend API Header Auth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const cfg = $('Carregar Config').first().json;\nconst res = $input.first().json;\nconst statusCode = res.statusCode || 200;\nconst body = res.body !== undefined ? res.body : res;\nconst already = statusCode === 200 && body && body.message_id;\nreturn [{ json: { ...cfg, _alreadyPublished: !!already, _existing: already ? body : null } }];\n"
+      },
+      "id": "a34af7fd-d0e2-4555-8b80-04d21b4aec46",
+      "name": "Já Foi Publicada?",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1000,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{$json._alreadyPublished}}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "051cfb93-2c6d-4710-bb4c-f9eae049fa51",
+      "name": "Já Publicado (evita duplicidade)?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1250,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "manual",
+        "duplicateItem": false,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1",
+              "name": "success",
+              "value": true,
+              "type": "boolean"
+            },
+            {
+              "id": "2",
+              "name": "message_id",
+              "value": "={{$json._existing.message_id}}",
+              "type": "string"
+            },
+            {
+              "id": "3",
+              "name": "remote_jid",
+              "value": "={{$json._existing.remote_jid}}",
+              "type": "string"
+            },
+            {
+              "id": "4",
+              "name": "timestamp",
+              "value": "={{$json._existing.published_at}}",
+              "type": "string"
+            },
+            {
+              "id": "5",
+              "name": "offer_id",
+              "value": "={{$json.offer_id}}",
+              "type": "string"
+            },
+            {
+              "id": "6",
+              "name": "destination",
+              "value": "={{$json.destination}}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "8124614d-73d8-4b2f-b85e-e4531c2aa3dc",
+      "name": "Retornar Sucesso (Já Enviado)",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1500,
+        150
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{$json.debugMode}}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "3ec8f1d6-9f5b-4c30-980f-ce4551f9f966",
+      "name": "Modo Debug?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1500,
+        450
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "manual",
+        "duplicateItem": false,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1",
+              "name": "success",
+              "value": true,
+              "type": "boolean"
+            },
+            {
+              "id": "2",
+              "name": "message_id",
+              "value": "=SIMULATED-{{$execution.id}}",
+              "type": "string"
+            },
+            {
+              "id": "3",
+              "name": "remote_jid",
+              "value": "=simulated@debug",
+              "type": "string"
+            },
+            {
+              "id": "4",
+              "name": "timestamp",
+              "value": "={{$now.toISO()}}",
+              "type": "string"
+            },
+            {
+              "id": "5",
+              "name": "offer_id",
+              "value": "={{$json.offer_id}}",
+              "type": "string"
+            },
+            {
+              "id": "6",
+              "name": "destination",
+              "value": "={{$json.destination}}",
+              "type": "string"
+            },
+            {
+              "id": "7",
+              "name": "_debugPayload",
+              "value": "={{JSON.stringify({message: $json.message, image: $json.image})}}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "a1aafc70-1000-475f-a08c-254842e882d8",
+      "name": "Simular Sucesso (Debug)",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1750,
+        550
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first().json;\nconst base = item.evolutionApiUrl.replace(/\\/$/, '');\nconst instance = item.evolutionInstance;\nconst hasImage = !!item.image;\n\n// Endpoints da Evolution API (v2). Confirme na documentação da versão instalada\n// antes de ativar em produção: variável EVOLUTION_API_VERSION.\nlet url, body;\nif (hasImage) {\n  url = `${base}/message/sendMedia/${instance}`;\n  body = {\n    number: item.destination,\n    mediatype: 'image',\n    media: item.image,\n    caption: item.message\n  };\n} else {\n  url = `${base}/message/sendText/${instance}`;\n  body = {\n    number: item.destination,\n    text: item.message\n  };\n}\n\nreturn [{ json: { ...item, evolutionUrl: url, evolutionBody: body } }];\n"
+      },
+      "id": "8ae3aaed-09e3-4499-9a36-27418de2c29b",
+      "name": "Preparar Payload Evolution",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1750,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$json.evolutionUrl}}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{$json.evolutionBody}}",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true,
+              "fullResponse": true
+            }
+          }
+        }
+      },
+      "id": "94de825f-01a0-4df7-a0a8-37d42d6d411d",
+      "name": "Enviar para Evolution API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2000,
+        300
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "CREDENTIAL_ID",
+          "name": "Evolution API Header Auth (apikey)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{$json.statusCode}}",
+              "rightValue": 300,
+              "operator": {
+                "type": "number",
+                "operation": "lt"
+              }
+            },
+            {
+              "id": "c2",
+              "leftValue": "={{$json.statusCode}}",
+              "rightValue": 200,
+              "operator": {
+                "type": "number",
+                "operation": "gte"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "73bbf296-97f7-44ed-8699-21519bd1411c",
+      "name": "Envio OK? (2xx)",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        2250,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const cfg = $('Preparar Payload Evolution').first().json;\nconst res = $input.first().json;\nconst body = res.body !== undefined ? res.body : res;\nreturn [{ json: {\n  success: true,\n  message_id: body.key ? body.key.id : (body.message_id || null),\n  remote_jid: body.key ? body.key.remoteJid : (body.remote_jid || cfg.destination),\n  timestamp: body.messageTimestamp ? new Date(body.messageTimestamp * 1000).toISOString() : new Date().toISOString(),\n  offer_id: cfg.offer_id,\n  destination: cfg.destination\n} }];\n"
+      },
+      "id": "03c8f11d-07f0-45dc-9b5e-c53433ffb961",
+      "name": "Extrair Resultado",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2500,
+        150
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const cfg = $('Preparar Payload Evolution').first().json;\nconst res = $input.first().json;\nconst body = res.body !== undefined ? res.body : res;\nconst attempt = cfg.attempt || 1;\nconst errorMsg = (body && (body.message || body.error)) ? JSON.stringify(body.message || body.error) : `HTTP ${res.statusCode}`;\nconst waits = { 1: 30, 2: 120, 3: 300 }; // segundos: 30s, 2min, 5min\nconst canRetry = attempt < 3;\nreturn [{ json: { ...cfg, attempt: attempt + 1, _canRetry: canRetry, _waitSeconds: waits[attempt] || 300, _lastError: errorMsg } }];\n"
+      },
+      "id": "aafe96df-83e2-4b5c-85b4-0a010454dbc2",
+      "name": "Ainda Há Tentativas?",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2500,
+        450
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{$json._canRetry}}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "d79d96dd-370e-49f0-95c8-be26cda499fc",
+      "name": "Tentar Novamente?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        2750,
+        450
+      ]
+    },
+    {
+      "parameters": {
+        "amount": "={{$json._waitSeconds}}",
+        "unit": "seconds"
+      },
+      "id": "48b08c0e-8047-416e-a92e-6f26f46f0996",
+      "name": "Aguardar Antes de Repetir",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        3000,
+        450
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "manual",
+        "duplicateItem": false,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1",
+              "name": "success",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "2",
+              "name": "error",
+              "value": "={{$json._lastError}}",
+              "type": "string"
+            },
+            {
+              "id": "3",
+              "name": "offer_id",
+              "value": "={{$json.offer_id}}",
+              "type": "string"
+            },
+            {
+              "id": "4",
+              "name": "destination",
+              "value": "={{$json.destination}}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "e0b701d8-345d-49ad-9b52-5558452a8be6",
+      "name": "Falha Final (3 Tentativas)",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        3000,
+        650
+      ]
+    }
+  ],
+  "connections": {
+    "Execute Workflow Trigger": {
+      "main": [
+        [
+          {
+            "node": "Carregar Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Carregar Config": {
+      "main": [
+        [
+          {
+            "node": "Verificar Publicação Existente",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verificar Publicação Existente": {
+      "main": [
+        [
+          {
+            "node": "Já Foi Publicada?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Já Foi Publicada?": {
+      "main": [
+        [
+          {
+            "node": "Já Publicado (evita duplicidade)?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Já Publicado (evita duplicidade)?": {
+      "main": [
+        [
+          {
+            "node": "Retornar Sucesso (Já Enviado)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Modo Debug?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Modo Debug?": {
+      "main": [
+        [
+          {
+            "node": "Simular Sucesso (Debug)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Preparar Payload Evolution",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar Payload Evolution": {
+      "main": [
+        [
+          {
+            "node": "Enviar para Evolution API",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enviar para Evolution API": {
+      "main": [
+        [
+          {
+            "node": "Envio OK? (2xx)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Envio OK? (2xx)": {
+      "main": [
+        [
+          {
+            "node": "Extrair Resultado",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Ainda Há Tentativas?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ainda Há Tentativas?": {
+      "main": [
+        [
+          {
+            "node": "Tentar Novamente?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tentar Novamente?": {
+      "main": [
+        [
+          {
+            "node": "Aguardar Antes de Repetir",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Falha Final (3 Tentativas)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aguardar Antes de Repetir": {
+      "main": [
+        [
+          {
+            "node": "Enviar para Evolution API",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "1",
+  "meta": {
+    "instanceId": ""
+  },
+  "tags": [
+    "afiliados",
+    "whatsapp",
+    "subworkflow",
+    "evolution-api"
+  ]
+}

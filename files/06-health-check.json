@@ -1,0 +1,261 @@
+{
+  "name": "06 - Health Check",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 30
+            }
+          ]
+        }
+      },
+      "id": "9e16752f-5592-4e93-8a2c-b6a77fc7b225",
+      "name": "Cron - A cada 30 min",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        250,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{$env.BACKEND_API_URL}}/api/automation/status",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true,
+              "fullResponse": true
+            }
+          }
+        }
+      },
+      "id": "33bcd15b-db2f-42fe-87d8-a020aa23f346",
+      "name": "Checar API Principal",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        500,
+        100
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "CREDENTIAL_ID",
+          "name": "Backend API Header Auth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{$env.EVOLUTION_API_URL}}/instance/connectionState/{{$env.EVOLUTION_INSTANCE}}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true,
+              "fullResponse": true
+            }
+          }
+        }
+      },
+      "id": "1ef0944b-d076-4e8b-a16d-c44568992aa3",
+      "name": "Checar Evolution API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        500,
+        250
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "CREDENTIAL_ID",
+          "name": "Evolution API Header Auth (apikey)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{$env.BACKEND_API_URL}}/api/automation/publications/last",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true,
+              "fullResponse": true
+            }
+          }
+        }
+      },
+      "id": "9309696a-35f4-4211-8b1c-dac2d9757d11",
+      "name": "Checar Última Publicação",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        500,
+        400
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "CREDENTIAL_ID",
+          "name": "Backend API Header Auth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combinationMode": "mergeByPosition",
+        "numberInputs": 3,
+        "options": {}
+      },
+      "id": "89c24328-4f3f-4b2e-8c70-5183a2689a32",
+      "name": "Consolidar Status",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [
+        750,
+        250
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst backend = items[0] ? items[0].json : {};\nconst evolution = items[1] ? items[1].json : {};\nconst lastPub = items[2] ? items[2].json : {};\nreturn [{ json: {\n  checked_at: new Date().toISOString(),\n  backend_api_ok: (backend.statusCode || 500) < 300,\n  evolution_api_ok: (evolution.statusCode || 500) < 300,\n  whatsapp_state: evolution.body ? evolution.body.state : null,\n  last_publication: lastPub.body || null\n} }];\n"
+      },
+      "id": "2d5f045b-9e28-4891-a9e6-b0814f5304fc",
+      "name": "Montar Relatório de Saúde",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1000,
+        250
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.BACKEND_API_URL}}/api/automation/health",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{$json}}",
+        "options": {}
+      },
+      "id": "f33cc992-7f96-4ccc-9e83-6b2cb0f217d6",
+      "name": "Salvar Status no Backend",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1250,
+        250
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "CREDENTIAL_ID",
+          "name": "Backend API Header Auth"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Cron - A cada 30 min": {
+      "main": [
+        [
+          {
+            "node": "Checar API Principal",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Checar Evolution API",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Checar Última Publicação",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Checar API Principal": {
+      "main": [
+        [
+          {
+            "node": "Consolidar Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Checar Evolution API": {
+      "main": [
+        [
+          {
+            "node": "Consolidar Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Checar Última Publicação": {
+      "main": [
+        [
+          {
+            "node": "Consolidar Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Montar Relatório de Saúde": {
+      "main": [
+        [
+          {
+            "node": "Salvar Status no Backend",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Consolidar Status": {
+      "main": [
+        [
+          {
+            "node": "Montar Relatório de Saúde",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "1",
+  "meta": {
+    "instanceId": ""
+  },
+  "tags": [
+    "afiliados",
+    "whatsapp",
+    "monitoramento"
+  ]
+}
